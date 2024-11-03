@@ -1,221 +1,126 @@
-AWSTemplateFormatVersion: "2010-09-09"
-Description: CloudFormation Template for Human Name System (HNS) Backend Infrastructure on AWS with Blockchain
+AWSTemplateFormatVersion: '2010-09-09'
 
 Resources:
-  # VPC for Network Segmentation
-  HNSVpc:
-    Type: AWS::EC2::VPC
+  HNSUserPool:
+    Type: AWS::Cognito::UserPool
     Properties:
-      CidrBlock: 10.0.0.0/16
-      EnableDnsSupport: true
-      EnableDnsHostnames: true
-      Tags:
-        - Key: Name
-          Value: HNS-VPC
+      UserPoolName: HNSUserPool
+      UsernameAttributes:
+        - email
+      AutoVerifiedAttributes:
+        - email
 
-  # Subnets for Public and Private Segments
-  PublicSubnet:
-    Type: AWS::EC2::Subnet
+  HNSUserPoolClient:
+    Type: AWS::Cognito::UserPoolClient
     Properties:
-      VpcId: !Ref HNSVpc
-      CidrBlock: 10.0.1.0/24
-      AvailabilityZone: !Select [ 0, !GetAZs "" ]
-      MapPublicIpOnLaunch: true
-      Tags:
-        - Key: Name
-          Value: HNS-Public-Subnet
+      UserPoolId: !Ref HNSUserPool
+      ClientName: HNSUserPoolClient
+      GenerateSecret: false
 
-  PrivateSubnet:
-    Type: AWS::EC2::Subnet
+  HNSDynamoDBTable:
+    Type: AWS::DynamoDB::Table
     Properties:
-      VpcId: !Ref HNSVpc
-      CidrBlock: 10.0.2.0/24
-      AvailabilityZone: !Select [ 1, !GetAZs "" ]
-      Tags:
-        - Key: Name
-          Value: HNS-Private-Subnet
+      TableName: HNSMappings
+      AttributeDefinitions:
+        - AttributeName: HNSName
+          AttributeType: S
+      KeySchema:
+        - AttributeName: HNSName
+          KeyType: HASH
+      BillingMode: PAY_PER_REQUEST
 
-  # Internet Gateway for Public Subnet
-  InternetGateway:
-    Type: AWS::EC2::InternetGateway
-    Properties:
-      Tags:
-        - Key: Name
-          Value: HNS-InternetGateway
-
-  AttachGateway:
-    Type: AWS::EC2::VPCGatewayAttachment
-    Properties:
-      VpcId: !Ref HNSVpc
-      InternetGatewayId: !Ref InternetGateway
-
-  # Route Table for Public Subnet
-  PublicRouteTable:
-    Type: AWS::EC2::RouteTable
-    Properties:
-      VpcId: !Ref HNSVpc
-      Tags:
-        - Key: Name
-          Value: HNS-Public-Route-Table
-
-  PublicRoute:
-    Type: AWS::EC2::Route
-    Properties:
-      RouteTableId: !Ref PublicRouteTable
-      DestinationCidrBlock: 0.0.0.0/0
-      GatewayId: !Ref InternetGateway
-
-  PublicSubnetRouteTableAssociation:
-    Type: AWS::EC2::SubnetRouteTableAssociation
-    Properties:
-      SubnetId: !Ref PublicSubnet
-      RouteTableId: !Ref PublicRouteTable
-
-  # Managed Blockchain Network for Decentralized Ledger
-  HNSBlockchainNetwork:
-    Type: AWS::ManagedBlockchain::Member
-    Properties:
-      NetworkId: my-blockchain-network-id
-      MemberConfiguration:
-        Name: HNS-Blockchain-Member
-        Description: Blockchain network member for HNS
-        FrameworkConfiguration:
-          Fabric:
-            AdminUsername: admin
-            AdminPassword: password
-        LogPublishingConfiguration:
-          Fabric:
-            CaLogs:
-              Cloudwatch: {}
-      Tags:
-        - Key: Name
-          Value: HNS-Blockchain-Network
-
-  # DocumentDB for Storing User Data
-  HNSDocumentDBCluster:
-    Type: AWS::DocDB::DBCluster
-    Properties:
-      DBClusterIdentifier: hns-documentdb-cluster
-      MasterUsername: admin
-      MasterUserPassword: password
-      VpcSecurityGroupIds:
-        - !Ref DocumentDBSecurityGroup
-      DBSubnetGroupName: !Ref DocumentDBSubnetGroup
-      Tags:
-        - Key: Name
-          Value: HNS-DocumentDB-Cluster
-
-  # DocumentDB Instance
-  HNSDocumentDBInstance:
-    Type: AWS::DocDB::DBInstance
-    Properties:
-      DBClusterIdentifier: !Ref HNSDocumentDBCluster
-      DBInstanceClass: db.r5.large
-      Tags:
-        - Key: Name
-          Value: HNS-DocumentDB-Instance
-
-  # Security Group for DocumentDB
-  DocumentDBSecurityGroup:
-    Type: AWS::EC2::SecurityGroup
-    Properties:
-      GroupDescription: Enable DocumentDB Access
-      VpcId: !Ref HNSVpc
-      SecurityGroupIngress:
-        - IpProtocol: tcp
-          FromPort: 27017
-          ToPort: 27017
-          CidrIp: 10.0.0.0/16
-      Tags:
-        - Key: Name
-          Value: HNS-DocumentDB-SG
-
-  # DocumentDB Subnet Group
-  DocumentDBSubnetGroup:
-    Type: AWS::DocDB::DBSubnetGroup
-    Properties:
-      DBSubnetGroupDescription: Subnet group for HNS DocumentDB instance
-      SubnetIds:
-        - !Ref PublicSubnet
-        - !Ref PrivateSubnet
-      Tags:
-        - Key: Name
-          Value: HNS-DocumentDB-Subnet-Group
-
-  # S3 Bucket for Storing Profile Data
-  HNSProfileBucket:
+  HNSBucket:
     Type: AWS::S3::Bucket
     Properties:
-      BucketName: hns-profile-data-storage
-      AccessControl: Private
-      Tags:
-        - Key: Name
-          Value: HNS-Profile-Data
+      BucketName: hns-user-profiles
+      NotificationConfiguration:
+        LambdaConfigurations:
+          - Event: s3:ObjectCreated:*
+            Function: !GetAtt VerifyIDLambda.Arn
 
-  # Lambda Function for API
-  HNSLambdaFunction:
-    Type: AWS::Lambda::Function
+  HNSApiGateway:
+    Type: AWS::ApiGateway::RestApi
     Properties:
-      FunctionName: HNS-Api-Handler
-      Runtime: nodejs20.x
-      Role: !GetAtt LambdaExecutionRole.Arn
-      Handler: index.handler
-      Code:
-        S3Bucket: my-lambda-code-bucket
-        S3Key: hns-api-handler.zip
-      VpcConfig:
-        SubnetIds:
-          - !Ref PrivateSubnet
-        SecurityGroupIds:
-          - !Ref DocumentDBSecurityGroup
-      Tags:
-        - Key: Name
-          Value: HNS-Lambda-Function
+      Name: HNSApi
 
-  # IAM Role for Lambda Execution
-  LambdaExecutionRole:
+  HNSLambdaRole:
     Type: AWS::IAM::Role
     Properties:
-      RoleName: HNS-Lambda-Execution-Role
       AssumeRolePolicyDocument:
-        Version: "2012-10-17"
+        Version: '2012-10-17'
         Statement:
           - Effect: Allow
             Principal:
               Service: lambda.amazonaws.com
             Action: sts:AssumeRole
       Policies:
-        - PolicyName: LambdaS3Access
+        - PolicyName: HNSLambdaPolicy
           PolicyDocument:
-            Version: "2012-10-17"
+            Version: '2012-10-17'
             Statement:
               - Effect: Allow
                 Action:
-                  - s3:GetObject
-                  - s3:PutObject
-                Resource: !Sub "arn:aws:s3:::hns-profile-data-storage/*"
-              - Effect: Allow
-                Action:
                   - dynamodb:*
+                  - s3:*
+                  - rekognition:*
                 Resource: "*"
-              - Effect: Allow
-                Action:
-                  - ec2:Describe*
-                Resource: "*"
+
+  RegisterHNSLambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: RegisterHNS
+      Handler: index.handler
+      Role: !GetAtt HNSLambdaRole.Arn
+      Code:
+        S3Bucket: lambda-code-bucket
+        S3Key: register_hns.zip
+      Runtime: nodejs20.x
+      Environment:
+        Variables:
+          TABLE_NAME: !Ref HNSDynamoDBTable
+
+  VerifyIDLambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: VerifyID
+      Handler: verify.handler
+      Role: !GetAtt HNSLambdaRole.Arn
+      Code:
+        S3Bucket: lambda-code-bucket
+        S3Key: verify_id.zip
+      Runtime: nodejs20.x
+      Environment:
+        Variables:
+          TABLE_NAME: !Ref HNSDynamoDBTable
+      Events:
+        S3Event:
+          Type: S3
+          Properties:
+            Bucket: !Ref HNSBucket
+            Events:
+              - s3:ObjectCreated:*
+
+  HNSApiGatewayResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref HNSApiGateway
+      ParentId: !GetAtt HNSApiGateway.RootResourceId
+      PathPart: register
+
+  HNSApiGatewayMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref HNSApiGateway
+      ResourceId: !Ref HNSApiGatewayResource
+      HttpMethod: POST
+      AuthorizationType: NONE
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub |
+          arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${RegisterHNSLambda.Arn}/invocations
 
 Outputs:
-  VPCId:
-    Description: VPC ID for the Human Name System
-    Value: !Ref HNSVpc
-
-  BlockchainNetworkId:
-    Description: Blockchain Network ID for the HNS
-    Value: !Ref HNSBlockchainNetwork
-
-  DocumentDBClusterEndpoint:
-    Description: Endpoint for the DocumentDB cluster
-    Value: !GetAtt HNSDocumentDBCluster.Endpoint
-
-  LambdaFunctionArn:
-    Description: ARN of the HNS API Lambda function
-    Value: !GetAtt HNSLambdaFunction.Arn
+  ApiUrl:
+    Description: "URL of the HNS API Gateway"
+    Value: !Sub "https://${HNSApiGateway}.execute-api.${AWS::Region}.amazonaws.com/prod/register"
