@@ -59,7 +59,9 @@ Imagine a Human Name System (HNS), similar to the Domain Name System (DNS), but 
 - **Verification Hurdles**: Effectively verifying identities, especially in regions without strong identity infrastructure.
 - **Privacy vs. Accountability**: Striking a balance between verified identities and privacy, ensuring users aren’t overly exposed but are still held accountable for their actions.
 
-## Final Thoughts
+## License
+[![License: CC BY-NC-SA 4.0](https://img.shields.io/badge/License-CC%20BY--NC--SA%204.0-lightgrey.svg)](https://creativecommons.org/licenses/by-nc-sa/4.0/)
+
 
 This "HNS for People" could foster a genuine and trustworthy social environment, effectively countering the issues of anonymity, bots, and centralized data control. It gives people ownership of their identity and ensures that social spaces are built on a foundation of trust and authenticity.
 
