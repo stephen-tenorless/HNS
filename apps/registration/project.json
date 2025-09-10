@@ -1,0 +1,32 @@
+{
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "name": "registration",
+  "projectType": "application",
+  "sourceRoot": "apps/registration/src",
+  "targets": {
+    "build": {
+      "executor": "@nx/angular:build",
+      "options": {
+        "outputPath": "dist/apps/registration",
+        "main": "apps/registration/src/main.ts",
+        "tsConfig": "apps/registration/tsconfig.app.json",
+        "assets": ["apps/registration/src/favicon.ico", "apps/registration/src/assets"],
+        "bundler": "vite"
+      }
+    },
+    "serve": {
+      "executor": "@nx/angular:serve",
+      "options": {
+        "buildTarget": "registration:build",
+        "hmr": true
+      }
+    },
+    "test": {
+      "executor": "@nx/angular:vitest",
+      "options": {
+        "vitestConfig": "apps/registration/vitest.config.ts"
+      }
+    }
+  },
+  "tags": []
+}
