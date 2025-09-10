@@ -1,54 +1,96 @@
 import { Component } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { NgIf } from '@angular/common';
 
 @Component({
-  selector: 'hns-root',
+  selector: 'app-root',
   standalone: true,
-  imports: [FormsModule],
+  imports: [FormsModule, NgIf],
   template: `
-    <h1>Register for HNS</h1>
-    <form (submit)="register($event)">
-      <label>
-        Name
-        <input name="name" [(ngModel)]="name" required />
-      </label>
-      <label>
-        Email
-        <input name="email" [(ngModel)]="email" required />
-      </label>
-      <button type="submit">Create Passkey</button>
-    </form>
-    <p *ngIf="message">{{ message }}</p>
+    <div class="container py-5">
+      <div class="text-center mb-5">
+        <h1>Human Name System</h1>
+        <p class="lead">
+          The Human Name System (HNS) maps verified human identities to secure digital profiles,
+          eliminating bots and enabling a trustworthy social network.
+        </p>
+      </div>
+
+      <div class="card shadow">
+        <div class="card-body">
+          <h2 class="card-title mb-4 text-center">Register</h2>
+          <form (submit)="register($event)">
+            <div class="mb-3">
+              <label class="form-label">First Name</label>
+              <input class="form-control" name="firstName" [(ngModel)]="firstName" required />
+            </div>
+            <div class="mb-3">
+              <label class="form-label">Last Name</label>
+              <input class="form-control" name="lastName" [(ngModel)]="lastName" required />
+            </div>
+            <div class="mb-3">
+              <label class="form-label">Birthdate</label>
+              <input class="form-control" type="date" name="birthDate" [(ngModel)]="birthDate" required />
+            </div>
+            <button type="submit" class="btn btn-primary w-100">Register with Passkey</button>
+          </form>
+          <div *ngIf="message" class="alert alert-info mt-3" role="alert">{{ message }}</div>
+        </div>
+      </div>
+    </div>
   `
 })
 export class AppComponent {
-  name = '';
-  email = '';
+  firstName = '';
+  lastName = '';
+  birthDate = '';
   message = '';
 
   async register(event: Event) {
     event.preventDefault();
     try {
+      const { Amplify, Auth } = await import('aws-amplify');
+      Amplify.configure({
+        Auth: {
+          region: 'YOUR_AWS_REGION',
+          userPoolId: 'YOUR_USER_POOL_ID',
+          userPoolWebClientId: 'YOUR_USER_POOL_CLIENT_ID'
+        }
+      });
+
+      await Auth.signUp({
+        username: `${this.firstName}${this.lastName}`,
+        password: crypto.randomUUID(),
+        attributes: {
+          given_name: this.firstName,
+          family_name: this.lastName,
+          birthdate: this.birthDate
+        }
+      });
+
       const publicKey: PublicKeyCredentialCreationOptions = {
         challenge: new Uint8Array(32),
         rp: { name: 'HNS' },
         user: {
-          id: new TextEncoder().encode(this.email),
-          name: this.name,
-          displayName: this.name
+          id: new TextEncoder().encode(`${this.firstName}${this.lastName}`),
+          name: `${this.firstName} ${this.lastName}`,
+          displayName: `${this.firstName} ${this.lastName}`
         },
         pubKeyCredParams: [{ type: 'public-key', alg: -7 }],
         authenticatorSelection: {
-          userVerification: 'required'
+          userVerification: 'required',
+          authenticatorAttachment: 'platform'
         },
         timeout: 60000,
         attestation: 'none'
       };
+
       await navigator.credentials.create({ publicKey });
-      this.message = 'Passkey created. HNS ID registered.';
+      this.message = 'Registration complete. Passkey created and Cognito entry established.';
     } catch (err) {
       console.error(err);
       this.message = 'Registration failed.';
     }
   }
+
 }
