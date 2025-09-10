@@ -3,7 +3,7 @@
   "npmScope": "hns",
   "tasksRunnerOptions": {
     "default": {
-      "runner": "@nx/js/tasks-runner",
+      "runner": "@nx/workspace/tasks-runners/default",
       "options": {
         "cacheableOperations": ["build", "test", "lint", "e2e"]
       }
@@ -14,3 +14,4 @@
     "libsDir": "libs"
   }
 }
+
