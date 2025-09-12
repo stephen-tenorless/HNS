@@ -1,0 +1,19 @@
+.hero {
+  background: linear-gradient(135deg, #6a11cb 0%, #2575fc 100%);
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  color: #fff;
+}
+
+.section-padding {
+  padding: 4rem 0;
+}
+
+.hero .btn {
+  padding: 0.75rem 2rem;
+}
+
+.features h3 {
+  font-weight: 600;
+}
